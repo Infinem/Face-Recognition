@@ -1,0 +1,104 @@
+import numpy as np
+import argparse
+import sys
+import cv2
+from smile import smile_detect
+import math
+from sklearn import neighbors
+import os
+import pickle
+from PIL import Image, ImageDraw
+import face_recognition
+
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+
+def load_image_into_numpy_array(image):
+  (im_width, im_height) = image.size
+  return np.array(image.getdata()).reshape(
+      (im_height, im_width, 3)).astype(np.uint8)
+
+
+def predict(X_img_path, knn_clf=None, model_path=None, distance_threshold=0.6):
+    """
+    Recognizes faces in given image using a trained KNN classifier
+
+    :param X_img_path: path to image to be recognized
+    :param knn_clf: (optional) a knn classifier object. if not specified, model_save_path must be specified.
+    :param model_path: (optional) path to a pickled knn classifier. if not specified, model_save_path must be knn_clf.
+    :param distance_threshold: (optional) distance threshold for face classification. the larger it is, the more chance
+           of mis-classifying an unknown person as a known one.
+    :return: a list of names and face locations for the recognized faces in the image: [(name, bounding box), ...].
+        For faces of unrecognized persons, the name 'unknown' will be returned.
+    """
+    if not os.path.isfile(X_img_path) or os.path.splitext(X_img_path)[1][1:] not in ALLOWED_EXTENSIONS:
+        raise Exception("Invalid image path: {}".format(X_img_path))
+
+    if knn_clf is None and model_path is None:
+        raise Exception("Must supply knn classifier either thourgh knn_clf or model_path")
+
+    # Load a trained KNN model (if one was passed in)
+    if knn_clf is None:
+        with open(model_path, 'rb') as f:
+            knn_clf = pickle.load(f)
+
+    # Load image file and find face locations
+    X_img = face_recognition.load_image_file(X_img_path)
+    X_face_locations = face_recognition.face_locations(X_img)
+
+    # If no faces are found in the image, return an empty result.
+    if len(X_face_locations) == 0:
+        return []
+
+    # Find encodings for faces in the test iamge
+    faces_encodings = face_recognition.face_encodings(X_img, known_face_locations=X_face_locations)
+
+    # Use the KNN model to find the best matches for the test face
+    closest_distances = knn_clf.kneighbors(faces_encodings, n_neighbors=1)
+    are_matches = [closest_distances[0][i][0] <= distance_threshold for i in range(len(X_face_locations))]
+
+    # Predict classes and remove classifications that aren't within the threshold
+    return [(pred, loc) if rec else ("unknown", loc) for pred, loc, rec in zip(knn_clf.predict(faces_encodings), X_face_locations, are_matches)]
+
+def check_db_fast(photo):
+    
+    predictions = predict(photo, model_path="trained_knn_model.clf")
+    
+    # Print results on the console
+    for name, (top, right, bottom, left) in predictions:
+        person = name
+    
+    try:
+        person
+    except NameError:  
+        person="you are not in the database"
+    else:
+        pass
+    
+    #Celebrity check
+    txt_file = open("celebrities.txt","r")
+    names = txt_file.readlines()
+    names = set(names)
+    
+    
+    
+    image = Image.open(photo)
+    photo = load_image_into_numpy_array(image)
+
+    smile_status = smile_detect(photo)
+    #print("Your face is in the database. Welcome, {identity}".format(identity = person),D)
+    
+    if (person+"\n" in names):
+        celebrity_status = 1
+    else:
+        celebrity_status = 0
+    
+
+    return {"detection_status":person, "celebrity_status":celebrity_status, "smile_status":smile_status}
+
+        
+        
+
+
+

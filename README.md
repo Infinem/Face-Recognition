@@ -8,4 +8,4 @@ The application is able to recognize 3 aspects:
 3)	Whether a person on the photo smiles or not
 
 
-**NOTE:** The new feature is added, you can deploy it on the server by docker file provided.
+**NOTE:** The new feature is added, you can deploy it on the server by provided docker file.
